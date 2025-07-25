@@ -16,7 +16,7 @@ The input csv should include at least three columns:
 
 •	decimalLongitude – decimal degrees in WGS84
 
-You can change the names of these columns, but if you do they must also be modified in the python script.
+You can change the names of these columns, but if you do they must also be modified in the R script.
 I downloaded statewide occurrence data from SEINet and iNaturalist research grade. Note that occurrence data downloaded directly from GBIF may have locations obscured for certain species. A SEINet login with special permissions allows us to use the most accurate locations available. I used many different tools to clean the source data and translate the scientific names to SNAMEs used in Biotics. I won’t cover the specifics of that process here.
 I provided a sample_occurrence_points_to_rank.csv file which is a slice of the iNaturalist and SEINet data that I prepared for Colorado. This can give you a sense of the fields I used and the formatting.
 
