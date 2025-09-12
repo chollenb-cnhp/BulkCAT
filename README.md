@@ -1,15 +1,16 @@
 # BulkCAT
-Multispecies NatureServe rarity rank calculator
+Multispecies NatureServe element rarity rank calculator
 
 Created by Clark Hollenberg at the Colorado Natural Heritage Program, October 2024
 
 **Introduction**
 
-This script imports a .csv file with rows containing multi-species point occurrence data and WGS84 latitude, longitude coordinates. The output is a xlsx file containing extent of occurrence (EOO), area of occupancy with count of 2 x 2km grid cells (AOO), number of hypothetical Element Occurrences (EOs), and calculated rarity rank. This enables large multi-species calculations which have limited functionality on RARECAT. Calculated values may differ from RARECAT by 1% at larger scales.
+This script imports a .csv file with rows containing multi-species point occurrence data and WGS84 latitude, longitude coordinates. 
+The output is a .xlsx file containing extent of occurrence (EOO) in square-km, area of occupancy with count of 2 x 2km grid cells (AOO), number of hypothetical Element Occurrences (EOs), and calculated rarity rank. This enables large multi-species calculations which have limited functionality on RARECAT. Calculated values may differ from RARECAT by 1% at larger scales.
 
 **Input data for ranking**
 
-The input csv should include at least three columns:
+The input .csv should include at least three columns:
 
 •	SNAME – species name
 
@@ -18,8 +19,8 @@ The input csv should include at least three columns:
 •	decimalLongitude – decimal degrees in WGS84
 
 You can change the names of these columns, but if you do they must also be modified in the R script.
-For vascular plants, I downloaded statewide occurrence data from SEINet and iNaturalist research grade. Note that occurrence data downloaded directly from GBIF may have locations obscured for certain species. A SEINet login with special permissions allows us to use the most accurate locations available. I used many different tools to clean the source data and translate the scientific names to SNAMEs used in Biotics. I won’t cover the specifics of that process here.
-I provided a sample_occurrence_points_to_rank.csv file which is a slice of the iNaturalist and SEINet data that I prepared for Colorado. This can give you a sense of the fields I used and the formatting.
+For vascular plants, I downloaded statewide occurrence data from SEINet and iNaturalist research grade. Note that occurrence data downloaded directly from GBIF may have locations obscured for certain species. A SEINet login with special permissions allows us to use the most accurate locations available. 
+I used many different tools to translate the scientific names to SNAMEs used in Biotics, with an iterative approach starting with synonyms from Biotics, then the rWCVP package, Symbiota synonyms, cross-referencing and using GNAME/SNAME mapping and infraspecific epithet dropping lastly to reach 99% translated names on SEINet. Deduplication is another important step, which I completed with a conservative approach to avoid deleting unique values. I prioritized duplicate records based on the number of records at the herbarium institution with our sample region (Colorado).
 
 **Ranking Rules**
 
