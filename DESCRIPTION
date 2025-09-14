@@ -1,0 +1,13 @@
+Package: BulkCAT
+Title: Multi-species conservation status assessment
+Version: 2.0.0
+Authors@R: person("Clark", "Hollenberg", , "chollenb@colostate.edu", role = c("aut", "cre"))
+Description: BulkCAT calculates conservation status metrics for multiple species using user-supplied point occurrence data with WGS84 latitude and longitude coordinates.
+ This package implements a bulk-processing version of the "Conservation status Assessment Tool" (CAT) methodology from IUCN and NatureServe.
+ For each species, it computes extent of occurrence (EOO in km²), area of occupancy (AOO, number of 2x2 km grid cells), number of hypothetical Element Occurrences (EOs), and an overall rarity rank.
+ This allows efficient multi-species assessments at scales not feasible with interactive tools like GeoCAT or RARECAT. Calculated values may differ from RARECAT by ~1% for large datasets.
+License: MIT + file LICENSE
+Imports: sf, dbscan
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
