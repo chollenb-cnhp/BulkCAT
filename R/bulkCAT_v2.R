@@ -53,7 +53,7 @@ run_bulkCAT <- function(input_df,
   # ----------------------------------------------------------------
   # ----- Convert to sf object and transform to equal area -----
   # ----------------------------------------------------------------
-  gdf <- sf::st_as_sf(df, coords = c(lat, lon), crs = wgs_crs)
+  gdf <- sf::st_as_sf(df, coords = c(lon, lat), crs = wgs_crs)
   gdf_proj <- sf::st_transform(gdf, crs = equal_area_crs)
 
   # ----------------------------------------------------------------
@@ -94,7 +94,6 @@ run_bulkCAT <- function(input_df,
     bottomleftpoints <- floor(coords / grid_size)
     uniquecells <- unique(bottomleftpoints)
     aoo_cells <- nrow(uniquecells)
-
     ###### EO Cluster Count (1 km buffer) ######
     clustering <- dbscan::dbscan(coords, eps = eo_separation, minPts = 1)
     num_clusters <- length(unique(clustering$cluster))
