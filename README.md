@@ -37,15 +37,15 @@ library(BulkCAT)
 
 ## **Input data for ranking**
 
-The input `.csv` should include at least three columns:
+The input dataframe should include at least three columns:
 
-* `SNAME` – species name
+* `acceptedName` – species name
 * `decimalLatitude` – decimal degrees in WGS84
 * `decimalLongitude` – decimal degrees in WGS84
 
 You can change the names of these columns, but if you do, they must also be modified in the function call.
 
-For vascular plants, occurrence data were downloaded from SEINet and iNaturalist research grade. Note that GBIF downloads may have obscured locations for some species. A SEINet login with special permissions allows use of the most accurate locations available.
+For vascular plants, occurrence data were downloaded from SEINet and iNaturalist research grade observations. Note that GBIF downloads may have obscured locations for some species. A SEINet login with special permissions allows use of the most accurate locations available.
 
 Scientific names were translated to SNAMEs used in Biotics using an iterative approach with Biotics synonyms, rWCVP, Symbiota, GNAME/SNAME mapping, and infraspecific epithet dropping to reach \~99% coverage. Deduplication was performed conservatively to avoid deleting unique records, prioritizing duplicates based on herbarium record counts for the sample region (Colorado).
 
