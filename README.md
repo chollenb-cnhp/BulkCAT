@@ -11,7 +11,7 @@ Created by Clark Hollenberg at the Colorado Natural Heritage Program, October 20
 BulkCAT calculates conservation status metrics for multiple species using user-supplied point occurrence data with WGS84 latitude and longitude coordinates. 
 The package implements a bulk-processing version of the "Conservation status Assessment Tool" (CAT) methodology from IUCN and NatureServe. 
 For each species, it computes extent of occurrence (EOO in km²), area of occupancy (AOO, number of 2x2 km grid cells), number of hypothetical Element Occurrences (EOs), and an overall rarity rank (subnational rank - SRank). 
-This allows efficient multi-species assessments at scales not feasible with interactive tools like GeoCAT or RARECAT. Calculated values may differ from RARECAT by ~1% for large datasets.
+This allows efficient multi-species assessments at scales not feasible with interactive tools like [GeoCAT](https://geocat.iucnredlist.org/) or [RARECAT](https://natureserve.shinyapps.io/RARECAT/). Calculated values may differ from RARECAT by ~1% for large datasets.
 
 ---
 
@@ -60,7 +60,7 @@ It uses:
 * **Area of Occupancy (AOO)** – double weighted
 * **Number of hypothetical EOs**
 
-Rules are based on the **RULES sheet** from the Element Rank Estimator Excel macro workbook (NatureServe): [link](https://www.natureserve.org/products/conservation-rank-calculator/download).
+Rules are based on the **RULES sheet** from the Element Rank Estimator Excel macro workbook (NatureServe): [Download](https://www.natureserve.org/products/conservation-rank-calculator/download).
 Bin divisions for AOO were adjusted to match the expected logic of the calculator.
 
 ---
@@ -95,7 +95,7 @@ input_df <- read.csv(csv_path)
 # Run BulkCAT
 results <- run_bulkCAT(
   input_df = input_df,
-  sname = "SNAME",
+  sname = "acceptedName",
   lat = "decimalLatitude",
   lon = "decimalLongitude",
   eo_separation = 1000,  # meters
