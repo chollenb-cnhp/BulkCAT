@@ -39,7 +39,7 @@ library(BulkCAT)
 
 The input `.csv` should include at least three columns:
 
-* `SNAME` – species name
+* `scientificName` – species name
 * `decimalLatitude` – decimal degrees in WGS84
 * `decimalLongitude` – decimal degrees in WGS84
 
@@ -92,10 +92,17 @@ library(BulkCAT)
 csv_path <- "path/to/input_file.csv"
 input_df <- read.csv(csv_path)
 
+# Remove duplicates
+input_df <- deduplicate(
+  input_df = input_df,
+  cols = c("recordedBy", "recordNumber", "scientificName", "eventDate")
+  institution_col = "institutionCode"
+)
+
 # Run BulkCAT
 results <- run_bulkCAT(
   input_df = input_df,
-  sname = "SNAME",
+  sname = "scientificName",
   lat = "decimalLatitude",
   lon = "decimalLongitude",
   eo_separation = 1000,  # meters

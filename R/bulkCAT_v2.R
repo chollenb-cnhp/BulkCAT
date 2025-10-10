@@ -4,7 +4,7 @@
 #' methodology. BulkCAT requires a user-curated multi-species point observations dataset with lat/lon columns.
 #'
 #' @param input_df Input multispecies observation points dataframe
-#' @param sname Species name column. Default = "acceptedName"
+#' @param sname Species name column. Default = "scientificName"
 #' @param lat Latitude column name. Default = "decimalLatitude"
 #' @param lon Longitude column name. Default = "decimalLongitude"
 #' @param eo_separation Minimum separation distance (m) for unique EO clusters. Default = 1000m.
@@ -12,8 +12,9 @@
 #'
 #' @return Dataframe with calculated rarity metrics for each species/element.
 #' @export
+#'
 run_bulkCAT <- function(input_df,
-                        sname = "acceptedName",
+                        sname = "scientificName",
                         lat = "decimalLatitude",
                         lon = "decimalLongitude",
                         eo_separation = 1000,
@@ -37,6 +38,9 @@ run_bulkCAT <- function(input_df,
   df <- input_df[(!is.na(input_df[[lat]]) &
                    !is.na(input_df[[lon]]) &
                    !is.na(input_df[[sname]])),]
+
+  # remove genus-only records (keep names with ≥ 2 parts)
+  df <- df[sapply(strsplit(df[[sname]], "\\s+"), length) >= 2, ]
 
   if (nrow(df) == 0) stop("No rows remaining after filtering missing lat/lon/species.")
 
@@ -73,11 +77,32 @@ run_bulkCAT <- function(input_df,
     # Match all descendant varieties/subspecies if just genus + species
     if (length(strsplit(species, "\\s+")[[1]]) == 2) {
       species_subset <- gdf_proj[startsWith(gdf_proj[[sname]], species), ]
-    }
-    else {
-      # if trinomial name, only rank using the infraspecific observations
-      species_subset <- gdf_proj[gdf_proj[[sname]] == species, ]
-    }
+    } else {
+      # trinomial: check if this is the only infraspecific taxon for the binomial
+      species_parts <- strsplit(species, "\\s+")[[1]]
+      binomial <- paste(species_parts[1:2], collapse = " ")
+
+      # find all taxa in list starting with the binomial
+      related_taxa <- grep(paste0("^", binomial, "\\b"), species_list, value = TRUE)
+      if (length(related_taxa) == 2) {
+        # only trinomial and binomial exists -> copy binomial results
+        print("Only one infraspecies found, matching binomial results...")
+        binomial_result <- results[nrow(results), ]
+        results <- rbind(results, data.frame(
+          species = species,
+          num_obs = binomial_result$num_obs,
+          eoo_area_km2 = binomial_result$eoo_area_km2,
+          aoo_num_cells = binomial_result$aoo_num_cells,
+          num_EOs = binomial_result$num_EOs,
+          stringsAsFactors = FALSE
+        ))
+          next  # skip recalculation for this trinomial
+        }
+      else {
+        # multiple infraspecific taxa -> only use exact match
+        species_subset <- gdf_proj[gdf_proj[[sname]] == species, ]
+      }}
+
 
     num_obs <- nrow(species_subset)     # count number of observations
     if (num_obs == 0) {
@@ -99,17 +124,15 @@ run_bulkCAT <- function(input_df,
     num_clusters <- length(unique(clustering$cluster))
 
     ###### Append to results ######
-    results[[length(results) + 1]] <- data.frame(
+    results <- rbind(results, data.frame(
       species = species,
       num_obs = num_obs,
       eoo_area_km2 = round(eoo_area_km2, 2),
       aoo_num_cells = aoo_cells,
       num_EOs = num_clusters,
       stringsAsFactors = FALSE
-    )
+    ))
   }
-
-  final_results <- do.call(rbind, results)
 
   # ----------------------------------------------------------------
   # ----- RANKING ROLL‑UP -----
@@ -139,11 +162,46 @@ run_bulkCAT <- function(input_df,
   score_num <- function(x) vapply(x, assign_points, numeric(1), rules = rules_df, metric = "Num")
   score_rank <- function(x) vapply(x, assign_points, character(1), rules = rules_df, metric = "Rank")
 
-  final_results$Points <- (score_eoo(final_results$eoo_area_km2) +
-                             2 * score_aoo(final_results$aoo_num_cells) +
-                             score_num(final_results$num_EOs)) / 4
+  results$Points <- (score_eoo(results$eoo_area_km2) +
+                             2 * score_aoo(results$aoo_num_cells) +
+                             score_num(results$num_EOs)) / 4
 
-  final_results$SRank <- score_rank(final_results$Points)
+  results$SRank <- score_rank(results$Points)
 
-  return(final_results)
+  return(results)
+}
+#' Deduplicate Records by Specified Columns
+#'
+#' Removes duplicate records from a data frame based on specified columns,
+#' giving priority to institutions with more records.
+#'
+#' @param input_df A data frame containing the records to deduplicate.
+#' @param cols A character vector of column names to check for duplicates.
+#'   Defaults to c("recordedBy", "recordNumber", "scientificName", "eventDate").
+#' @param institution_col A string specifying the column name used to prioritize
+#'   records by institution count. Defaults to "institutionCode".
+#'
+#' @return A data frame with duplicates removed. Prints the number of records removed.
+#' @export
+#'
+deduplicate <- function(input_df, cols = c("recordedBy", "recordNumber", "scientificName", "eventDate"), institution_col = "institutionCode") {
+  # Step 1: count records per institution
+  inst_counts <- table(input_df[[institution_col]])
+
+  # Step 2: add counts back as a helper column
+  input_df$inst_count <- inst_counts[input_df[[institution_col]]]
+
+  # Step 3: order rows by inst_count (descending), then by original order
+  ord <- order(-input_df$inst_count, seq_len(nrow(input_df)))
+  input_df <- input_df[ord, ]
+
+  # Step 4: drop duplicates based on user-defined columns
+  dedup_df <- input_df[!duplicated(input_df[cols]), ]
+
+  # Remove helper column
+  dedup_df$inst_count <- NULL
+  duplicates <- nrow(input_df) - nrow(dedup_df)
+  cat("Observations removed via deduplication:", duplicates, "\n")
+
+  return(dedup_df)
 }

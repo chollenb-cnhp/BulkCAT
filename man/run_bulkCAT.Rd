@@ -6,7 +6,7 @@
 \usage{
 run_bulkCAT(
   input_df,
-  sname = "acceptedName",
+  sname = "scientificName",
   lat = "decimalLatitude",
   lon = "decimalLongitude",
   eo_separation = 1000,
@@ -16,7 +16,7 @@ run_bulkCAT(
 \arguments{
 \item{input_df}{Input multispecies observation points dataframe}
 
-\item{sname}{Species name column. Default = "acceptedName"}
+\item{sname}{Species name column. Default = "scientificName"}
 
 \item{lat}{Latitude column name. Default = "decimalLatitude"}
 
