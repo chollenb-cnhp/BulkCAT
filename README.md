@@ -45,6 +45,8 @@ The input `.csv` should include at least three columns:
 
 You can change the names of these columns, but if you do, they must also be modified in the function call.
 
+There is an option to include a polygon layer as a shapefile for calculation of AOO, which may be helpful for plant communities or large occurrences best defined by a polygon.
+
 For vascular plants, occurrence data were downloaded from SEINet and iNaturalist research grade. Note that GBIF downloads may have obscured locations for some species. A SEINet login with special permissions allows use of the most accurate locations available.
 
 Scientific names were translated to SNAMEs used in Biotics using an iterative approach with Biotics synonyms, rWCVP, Symbiota, GNAME/SNAME mapping, and infraspecific epithet dropping to reach \~99% coverage. Deduplication was performed conservatively to avoid deleting unique records, prioritizing duplicates based on herbarium record counts for the sample region (Colorado).
@@ -106,7 +108,9 @@ results <- run_bulkCAT(
   lat = "decimalLatitude",
   lon = "decimalLongitude",
   eo_separation = 1000,  # meters
-  grid_size = 2000        # meters
+  grid_size = 2000,      # meters
+  community = FALSE,
+  poly_layer = NULL
 )
 
 # View results
