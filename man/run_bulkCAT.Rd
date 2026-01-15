@@ -10,7 +10,9 @@ run_bulkCAT(
   lat = "decimalLatitude",
   lon = "decimalLongitude",
   eo_separation = 1000,
-  grid_size = 2000
+  grid_size = 2000,
+  community = FALSE,
+  poly_layer = NULL
 )
 }
 \arguments{
@@ -25,6 +27,10 @@ run_bulkCAT(
 \item{eo_separation}{Minimum separation distance (m) for unique EO clusters. Default = 1000m.}
 
 \item{grid_size}{Side length (m) for AOO grid cells. Default = 2000m.}
+
+\item{community}{Boolean if the input contains plant association (or non-scientific) names. Default = FALSE.}
+
+\item{poly_layer}{Shapefile path or sf object for polygon layer to be used for calculating AOO. Default = NULL.}
 }
 \value{
 Dataframe with calculated rarity metrics for each species/element.

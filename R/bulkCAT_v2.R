@@ -9,7 +9,8 @@
 #' @param lon Longitude column name. Default = "decimalLongitude"
 #' @param eo_separation Minimum separation distance (m) for unique EO clusters. Default = 1000m.
 #' @param grid_size Side length (m) for AOO grid cells. Default = 2000m.
-#'
+#' @param community Boolean if the input contains plant association (or non-scientific) names. Default = FALSE.
+#' @param poly_layer Shapefile path or sf object for polygon layer to be used for calculating AOO. Default = NULL.
 #' @return Dataframe with calculated rarity metrics for each species/element.
 #' @export
 #'
@@ -18,7 +19,9 @@ run_bulkCAT <- function(input_df,
                         lat = "decimalLatitude",
                         lon = "decimalLongitude",
                         eo_separation = 1000,
-                        grid_size = 2000) {
+                        grid_size = 2000,
+                        community = FALSE,
+                        poly_layer = NULL) {
 
   # ----------------------------------------------------------------
   # ----- Input validation -----
@@ -48,12 +51,23 @@ run_bulkCAT <- function(input_df,
     stop("Species column has only missing values.")
   }
 
+
   # ----------------------------------------------------------------
   # ----- Prepare coordinate reference systems -----
   # ----------------------------------------------------------------
   equal_area_crs <- 6933  # World Cylindrical Equal Area projection
   wgs_crs <- 4326         # WGS84
+  if (!is.null(poly_layer)) {
+    if (inherits(poly_layer, "character")) {
+      poly_sf <- st_read(poly_layer, quiet = TRUE)
+    } else if (inherits(poly_layer, "sf")) {
+      poly_sf <- poly_layer
+    } else {
+      stop("poly_layer must be either a path to a shapefile or an sf object.")
+    }
 
+    # ensure it's in World Equal Area
+    poly_sf <- st_transform(poly_sf, crs = 6933)}
   # ----------------------------------------------------------------
   # ----- Convert to sf object and transform to equal area -----
   # ----------------------------------------------------------------
@@ -75,39 +89,49 @@ run_bulkCAT <- function(input_df,
     cat("Processing:", species, "\n")
 
     # Match all descendant varieties/subspecies if just genus + species
-    if (length(strsplit(species, "\\s+")[[1]]) == 2) {
-      species_subset <- gdf_proj[startsWith(gdf_proj[[sname]], species), ]
-    } else {
-      # trinomial: check if this is the only infraspecific taxon for the binomial
-      species_parts <- strsplit(species, "\\s+")[[1]]
-      binomial <- paste(species_parts[1:2], collapse = " ")
+    if (community == FALSE){
+      if (length(strsplit(species, "\\s+")[[1]]) == 2) {
+        species_subset <- gdf_proj[startsWith(gdf_proj[[sname]], species), ]
+      } else {
+        # trinomial: check if this is the only infraspecific taxon for the binomial
+        species_parts <- strsplit(species, "\\s+")[[1]]
+        binomial <- paste(species_parts[1:2], collapse = " ")
 
-      # find all taxa in list starting with the binomial
-      related_taxa <- grep(paste0("^", binomial, "\\b"), species_list, value = TRUE)
-      if (length(related_taxa) == 2) {
-        # only trinomial and binomial exists -> copy binomial results
-        print("Only one infraspecies found, matching binomial results...")
-        binomial_result <- results[nrow(results), ]
-        results <- rbind(results, data.frame(
-          species = species,
-          num_obs = binomial_result$num_obs,
-          eoo_area_km2 = binomial_result$eoo_area_km2,
-          aoo_num_cells = binomial_result$aoo_num_cells,
-          num_EOs = binomial_result$num_EOs,
-          stringsAsFactors = FALSE
-        ))
-          next  # skip recalculation for this trinomial
-        }
-      else {
-        # multiple infraspecific taxa -> only use exact match
-        species_subset <- gdf_proj[gdf_proj[[sname]] == species, ]
+        # find all taxa in list starting with the binomial
+        related_taxa <- grep(paste0("^", binomial, "\\b"), species_list, value = TRUE)
+        if (length(related_taxa) == 2) {
+          # only trinomial and binomial exists -> copy binomial results
+          print("Only one infraspecies found, matching binomial results...")
+          binomial_result <- results[nrow(results), ]
+          results <- rbind(results, data.frame(
+            species = species,
+            num_obs = binomial_result$num_obs,
+            eoo_area_km2 = binomial_result$eoo_area_km2,
+            aoo_num_cells = binomial_result$aoo_num_cells,
+            num_EOs = binomial_result$num_EOs,
+            stringsAsFactors = FALSE
+          ))
+            next  # skip recalculation for this trinomial
+          }
+        else {
+          # multiple infraspecific taxa -> only use exact match
+          species_subset <- gdf_proj[gdf_proj[[sname]] == species, ]
+        }}
+
+      num_obs <- nrow(species_subset)     # count number of observations
+      if (num_obs == 0) {
+        warning("No observations for species: ", species, "; skipping.")
+        next
       }}
-
-
-    num_obs <- nrow(species_subset)     # count number of observations
-    if (num_obs == 0) {
-      warning("No observations for species: ", species, "; skipping.")
-      next
+    # if processing a plant community dataset
+    else
+    {
+      species_subset <- gdf_proj[gdf_proj[[sname]] == species, ]
+      num_obs <- nrow(species_subset)     # count number of observations
+      if (num_obs == 0) {
+        warning("No observations for species: ", species, "; skipping.")
+        next
+      }
     }
 
     ###### EOO: Convex Hull Area ######
@@ -116,9 +140,45 @@ run_bulkCAT <- function(input_df,
 
     ###### AOO: 2x2 km Grid ######
     coords <- sf::st_coordinates(species_subset)
-    bottomleftpoints <- floor(coords / grid_size)
-    uniquecells <- unique(bottomleftpoints)
-    aoo_cells <- nrow(uniquecells)
+    if (!is.null(poly_layer)) {
+      poly_subset <- poly_sf[poly_sf[[sname]]==species, ]
+
+      # Fixed global origin (IUCN-style)
+      origin <- c(0, 0)
+
+      # Get bounding box
+      bb <- sf::st_bbox(poly_subset)
+
+      # Snap bbox to grid
+      xmin <- floor((as.numeric(bb["xmin"]) - origin[1]) / grid_size) * grid_size + origin[1]
+      ymin <- floor((as.numeric(bb["ymin"]) - origin[2]) / grid_size) * grid_size + origin[2]
+      xmax <- ceiling((as.numeric(bb["xmax"]) - origin[1]) / grid_size) * grid_size + origin[1]
+      ymax <- ceiling((as.numeric(bb["ymax"]) - origin[2]) / grid_size) * grid_size + origin[2]
+
+      # Create snapped bbox polygon
+      snapped_bbox <- sf::st_as_sfc(sf::st_bbox(
+        c(xmin = xmin, ymin = ymin, xmax = xmax, ymax = ymax),
+        crs = sf::st_crs(poly_subset)
+      ))
+      # Build grid
+      grid <- sf::st_make_grid(
+        snapped_bbox,
+        cellsize = grid_size,
+        square = TRUE
+      )
+      grid_sf <- sf::st_sf(geometry = grid)
+
+      # Intersect grid with species geometry
+      hits <- sf::st_intersects(grid_sf, poly_subset, sparse = FALSE)
+      # Count occupied cells
+      aoo_cells <- sum(apply(hits, 1, any))
+    } else{
+
+      bottomleftpoints <- floor(coords / grid_size)
+      uniquecells <- unique(bottomleftpoints)
+      aoo_cells <- nrow(uniquecells)
+    }
+
     ###### EO Cluster Count (1 km buffer) ######
     clustering <- dbscan::dbscan(coords, eps = eo_separation, minPts = 1)
     num_clusters <- length(unique(clustering$cluster))
