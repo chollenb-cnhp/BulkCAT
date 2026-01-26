@@ -9,6 +9,7 @@
 #' @param lon Longitude column name. Default = "decimalLongitude"
 #' @param eo_separation Minimum separation distance (m) for unique EO clusters. Default = 1000m.
 #' @param grid_size Side length (m) for AOO grid cells. Default = 2000m.
+#' @param threats Boolean if you would like threat options in the output. calc_threats() can also be run on the output later.
 #' @param community Boolean if the input contains plant association (or non-scientific) names. Default = FALSE.
 #' @param poly_layer Shapefile path or sf object for polygon layer to be used for calculating AOO. Default = NULL.
 #' @return Dataframe with calculated rarity metrics for each species/element.
@@ -20,6 +21,7 @@ run_bulkCAT <- function(input_df,
                         lon = "decimalLongitude",
                         eo_separation = 1000,
                         grid_size = 2000,
+                        threats = FALSE,
                         community = FALSE,
                         poly_layer = NULL) {
 
@@ -227,6 +229,9 @@ run_bulkCAT <- function(input_df,
                              score_num(results$num_EOs)) / 4
 
   results$SRank <- score_rank(results$Points)
+  if (threats){
+    results <- calc_threats(results)
+  }
 
   return(results)
 }
@@ -264,4 +269,64 @@ deduplicate <- function(input_df, cols = c("recordedBy", "recordNumber", "scient
   cat("Observations removed via deduplication:", duplicates, "\n")
 
   return(dedup_df)
+}
+
+#' Show the effects of different potential threat options on calculated ranks.
+#'
+#' Includes low, medium, and high threat options, calculating SRank_lowT, SRank_medT, SRank_highT
+#' to assist with review of rarity-based ranks.
+#'
+#' @param input_df A data frame containing the records to deduplicate {usually an output of runBulkCAT()}
+#' @param points_col A string specifying the column name which contains rarity-based points.
+#'   Defaults to "Points".
+#'
+#' @return A data frame calculated SRanks and Points for different threat options.
+#' @export
+#'
+calc_threats <- function(input_df, points_col = "Points") {
+  # create rules_df based on NS methodology (same as in run_BulkCAT())
+  rules_df <- data.frame(
+    EOOVal = c(100, 250, 1000, 5000, 20000, 200000, 2500000, 25000000, NA),
+    EOOScore = c(0, 0.79, 1.57, 2.36, 3.14, 3.93, 4.71, 5.5, NA),
+    AOOVal = c(1, 2, 5, 20, 125, 500, 5000, 50000, 10000000),
+    AOOScore = c(0, 0.69, 1.38, 2.06, 2.75, 3.44, 4.13, 4.81, 5.5),
+    NumVal = c(5, 20, 80, 300, 1200, 1000000, NA, NA, NA),
+    NumScore = c(0, 1.38, 2.75, 4.13, 5.5, 5.5, NA, NA, NA),
+    RankVal = c(1.5, 2.5, 3.5, 4.5, 6, NA, NA, NA, NA),
+    RankScore = c("S1", "S2", "S3", "S4", "S5", NA, NA, NA, NA),
+    stringsAsFactors = FALSE
+  )
+
+  assign_points <- function(value, rules, metric) {
+    val_col <- paste0(metric, "Val")
+    score_col <- paste0(metric, "Score")
+    idx <- which(value <= rules[[val_col]])[1]
+    if (length(idx)==0) return(0)
+    rules[[score_col]][idx]
+  }
+
+  score_rank <- function(x) vapply(x, assign_points, character(1), rules = rules_df, metric = "Rank")
+
+
+  # threat scenarios
+  threats <- data.frame(
+    suffix = c("_HighT", "_MedT", "_LowT"),
+    value  = c(1.83, 3.67, 5.5),
+    stringsAsFactors = FALSE
+  )
+
+  # apply threats
+  for (i in seq_len(nrow(threats))) {
+
+    threat <- threats$suffix[i]
+    value  <- threats$value[i]
+
+    points_col_new <- paste0(points_col, threat)
+    srank_col_new  <- paste0("SRank", threat)
+
+    input_df[[points_col_new]] <- input_df[[points_col]] * 0.7 + value * 0.3
+    input_df[[srank_col_new]]  <- score_rank(input_df[[points_col_new]])
+  }
+
+  return(input_df)
 }

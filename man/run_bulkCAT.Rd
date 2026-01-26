@@ -11,6 +11,7 @@ run_bulkCAT(
   lon = "decimalLongitude",
   eo_separation = 1000,
   grid_size = 2000,
+  threats = FALSE,
   community = FALSE,
   poly_layer = NULL
 )
@@ -27,6 +28,8 @@ run_bulkCAT(
 \item{eo_separation}{Minimum separation distance (m) for unique EO clusters. Default = 1000m.}
 
 \item{grid_size}{Side length (m) for AOO grid cells. Default = 2000m.}
+
+\item{threats}{Boolean if you would like threat options in the output. calc_threats() can also be run on the output later.}
 
 \item{community}{Boolean if the input contains plant association (or non-scientific) names. Default = FALSE.}
 
