@@ -97,7 +97,7 @@ input_df <- read.csv(csv_path)
 # Remove duplicates
 input_df <- deduplicate(
   input_df = input_df,
-  cols = c("recordedBy", "recordNumber", "scientificName", "eventDate")
+  cols = c("recordedBy", "recordNumber", "scientificName", "eventDate"),
   institution_col = "institutionCode"
 )
 
