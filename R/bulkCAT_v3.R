@@ -183,7 +183,7 @@ run_bulkCAT <- function(input_df,
 
     ###### EO Cluster Count (1 km buffer) ######
     clustering <- dbscan::dbscan(coords, eps = eo_separation, minPts = 1)
-    num_clusters <- length(unique(clustering$cluster))
+    num_clusters <- max(clustering$cluster)
 
     ###### Append to results ######
     results <- rbind(results, data.frame(
@@ -200,11 +200,11 @@ run_bulkCAT <- function(input_df,
   # ----- RANKING ROLL‑UP -----
   # ----------------------------------------------------------------
   rules_df <- data.frame(
-    EOOVal = c(100, 250, 1000, 5000, 20000, 200000, 2500000, 25000000, NA),
+    EOOVal = c(100, 250, 1000, 5000, 20000, 200000, 2500000, 1000000000000000, NA),
     EOOScore = c(0, 0.79, 1.57, 2.36, 3.14, 3.93, 4.71, 5.5, NA),
-    AOOVal = c(1, 2, 5, 20, 125, 500, 5000, 50000, 10000000),
+    AOOVal = c(1, 2, 5, 25, 125, 500, 2500, 12500, 1000000000000000),
     AOOScore = c(0, 0.69, 1.38, 2.06, 2.75, 3.44, 4.13, 4.81, 5.5),
-    NumVal = c(5, 20, 80, 300, 1200, 1000000, NA, NA, NA),
+    NumVal = c(5, 20, 80, 300, 1200, 1000000000000000, NA, NA, NA),
     NumScore = c(0, 1.38, 2.75, 4.13, 5.5, 5.5, NA, NA, NA),
     RankVal = c(1.5, 2.5, 3.5, 4.5, 6, NA, NA, NA, NA),
     RankScore = c("S1", "S2", "S3", "S4", "S5", NA, NA, NA, NA),
