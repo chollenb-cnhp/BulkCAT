@@ -310,8 +310,8 @@ calc_threats <- function(input_df, points_col = "Points") {
 
   # threat scenarios
   threats <- data.frame(
-    suffix = c("_HighT", "_MedT", "_LowT"),
-    value  = c(1.83, 3.67, 5.5),
+    suffix = c("_VeryHighT", "_HighT", "_MedT", "_LowT"),
+    value  = c(0, 1.83, 3.67, 5.5),
     stringsAsFactors = FALSE
   )
 
