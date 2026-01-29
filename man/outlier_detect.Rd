@@ -24,27 +24,16 @@ outlier_detect(
 
 \item{lon}{Column name for longitude in decimal degrees (default: "decimalLongitude").}
 
-\item{elev_dem}{Optional file path to raster DEM. If NULL, elevation checks are skipped.}
+\item{elev_dem}{Optional file path to raster DEM or a terra SpatRaster. If NULL, elevation checks are skipped.}
 
-\item{eco_shp}{Optional file path to ecoregion shapefile. If NULL, ecoregion checks are skipped.}
+\item{eco_shp}{Optional file path to ecoregion shapefile or an sf object. If NULL, ecoregion checks are skipped.}
 
 \item{suspicion_thresh}{Threshold for flagging a point as suspect (default: 0.8).}
 
-\item{weights}{Named vector of weights for combining indicators
-(default: c(isolation = 0.5, density = 0.3, ecoregion = 0.1, elevation = 0.2)).}
+\item{weights}{Named vector of weights for combining indicators.}
 }
 \value{
-Data frame with original columns plus:
-\item{nn_dist}{Nearest neighbor distance.}
-\item{density_count}{Number of points found in specified density radius.}
-\item{density_score}{Suspicion probability based on density count (0–1).}
-\item{D2}{Distance to second nearest neighbor.}
-\item{isolation_score}{Suspicion probability based on D2 (0-1).}
-\item{eco_score}{Suspicion probability based on ecoregion (0–1).}
-\item{combined_score}{Composite suspicion probability (0-1).}
-\item{LEVEL3}{Level 3 EPA ecoregion ID.}
-\item{elev}{Elevation in meters.}
-\item{elev_score}{Suspicion probability based on elevation (0-1).}
+Data frame with original columns plus outlier diagnostics and scores.
 }
 \description{
 Identifies potentially erroneous or suspect herbarium / observation records
