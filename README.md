@@ -97,7 +97,7 @@ input_df <- read.csv(csv_path)
 # Remove duplicates
 input_df <- deduplicate(
   input_df = input_df,
-  cols = c("recordedBy", "recordNumber", "scientificName", "eventDate")
+  cols = c("recordedBy", "recordNumber", "scientificName", "eventDate"),
   institution_col = "institutionCode"
 )
 
@@ -109,12 +109,19 @@ results <- run_bulkCAT(
   lon = "decimalLongitude",
   eo_separation = 1000,  # meters
   grid_size = 2000,      # meters
+  threats = FALSE,
   community = FALSE,
   poly_layer = NULL
 )
 
 # View results
 head(results)
+
+# calculate impact of high/med/low threat options (if not done in run_BulkCAT())
+results <- calc_threats(
+  input_df = results,
+  points_col = "Points"
+)
 
 # export to csv
 output_path <- "path/to/output.csv
