@@ -11,6 +11,7 @@ synonymize(
   checklist_name_col = "SNAME",
   synonym_LUTs = list(),
   synonym_sources = c("NatureServe", "SEINet", "USDA", "WCVP"),
+  synonym_sources_rerun = FALSE,
   fuzzy = TRUE,
   wcvp_rerun = FALSE,
   ssp_mods = FALSE
@@ -31,6 +32,8 @@ the built-in NatureServe Network tracheophyte checklist is used. This may contai
 
 \item{synonym_sources}{Character vector giving the order of built-in synonym sources
 to apply. Any of \code{"NatureServe"}, \code{"SEINet"}, \code{"USDA"}, \code{"WCVP"}.}
+
+\item{synonym_sources_rerun}{Logical. If TRUE, reload synonym sources (ex: with a new target checklist).}
 
 \item{fuzzy}{Logical. If TRUE, attempt exact and fuzzy matching using \pkg{rWCVP}.}
 

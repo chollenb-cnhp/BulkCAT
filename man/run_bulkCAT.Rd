@@ -5,7 +5,7 @@
 \title{Run BulkCAT analysis}
 \usage{
 run_bulkCAT(
-  input_df,
+  input_df = NULL,
   sname = "scientificName",
   lat = "decimalLatitude",
   lon = "decimalLongitude",
@@ -40,5 +40,5 @@ Dataframe with calculated rarity metrics for each species/element.
 }
 \description{
 This function completes conservation status assessments (rarity ranks) using NatureServe
-methodology. BulkCAT requires a user-curated multi-species point observations dataset with lat/lon columns.
+methodology. BulkCAT requires a multi-species dataset with name column sname and EITHER a point observations dataframe with lat/lon columns OR a polygon layer.
 }

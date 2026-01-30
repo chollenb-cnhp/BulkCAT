@@ -1,7 +1,7 @@
 #' Run BulkCAT analysis
 #'
 #' This function completes conservation status assessments (rarity ranks) using NatureServe
-#' methodology. BulkCAT requires a user-curated multi-species point observations dataset with lat/lon columns.
+#' methodology. BulkCAT requires a multi-species dataset with name column sname and EITHER a point observations dataframe with lat/lon columns OR a polygon layer.
 #'
 #' @param input_df Input multispecies observation points dataframe
 #' @param sname Species name column. Default = "scientificName"
@@ -15,7 +15,7 @@
 #' @return Dataframe with calculated rarity metrics for each species/element.
 #' @export
 #'
-run_bulkCAT <- function(input_df,
+run_bulkCAT <- function(input_df = NULL,
                         sname = "scientificName",
                         lat = "decimalLatitude",
                         lon = "decimalLongitude",
@@ -28,53 +28,87 @@ run_bulkCAT <- function(input_df,
   # ----------------------------------------------------------------
   # ----- Input validation -----
   # ----------------------------------------------------------------
-  if (!is.data.frame(input_df)) stop("input_df must be a data frame.")
+  if (!is.null(input_df)){
+    if (!is.null(poly_layer)){
+      stop("You should provide EITHER an input_df of lat/lon coordinates OR a poly_layer, not both!")
+    }
+    if (!is.data.frame(input_df))
+    {
+      stop("input_df must be a data frame.")
+    }
+    else{
+      print("Loading points from input_df...")
+      required_cols <- c(sname, lat, lon)
+      missing_cols <- setdiff(required_cols, names(input_df))
+      if (length(missing_cols) > 0) {
+        stop("Missing required columns: ", paste(missing_cols, collapse = ", "))
+      }
+      if (!is.numeric(input_df[[lat]]) || !is.numeric(input_df[[lon]])) {
+        stop("Latitude and longitude columns must be numeric.")
+      }
 
-  required_cols <- c(sname, lat, lon)
-  missing_cols <- setdiff(required_cols, names(input_df))
-  if (length(missing_cols) > 0) {
-    stop("Missing required columns: ", paste(missing_cols, collapse = ", "))
-  }
+      df <- input_df[(!is.na(input_df[[lat]]) &
+                        !is.na(input_df[[lon]]) &
+                        !is.na(input_df[[sname]])),]
 
-  if (!is.numeric(input_df[[lat]]) || !is.numeric(input_df[[lon]])) {
-    stop("Latitude and longitude columns must be numeric.")
-  }
+      # remove genus-only records (keep names with ≥ 2 parts)
+      df <- df[sapply(strsplit(df[[sname]], "\\s+"), length) >= 2, ]
 
-  df <- input_df[(!is.na(input_df[[lat]]) &
-                   !is.na(input_df[[lon]]) &
-                   !is.na(input_df[[sname]])),]
+      if (!is.null(poly_layer)){
+        print("Polygon layer was provided, but will be ignored. Input dataframe will be used for all calculations.")
+      }
+    }
+     }
+    else{
+      if (!is.null(poly_layer)) {
+      if (inherits(poly_layer, "character")) {
+        poly_sf <- sf::st_read(poly_layer, quiet = TRUE)
+      } else if (inherits(poly_layer, "sf")) {
+        poly_sf <- poly_layer
+      } else {
+        stop("poly_layer must be either a path to a shapefile or an sf object.")
+      }
+        # create input_df from polygon centroids (used for EOO and num_EOs)
+        # polygon layer should be created from source features, no EOs
 
-  # remove genus-only records (keep names with ≥ 2 parts)
-  df <- df[sapply(strsplit(df[[sname]], "\\s+"), length) >= 2, ]
+        # ensure CRS exists
+        if (is.na(sf::st_crs(poly_sf))) {
+          stop("poly_layer has no CRS defined.")
+        }
 
-  if (nrow(df) == 0) stop("No rows remaining after filtering missing lat/lon/species.")
+        # reproject to WGS84 for lat/lon
+        poly_sf <- sf::st_transform(poly_sf, 4326)
 
-  if (all(is.na(input_df[[sname]]))) {
+        # centroids in geographic coordinates
+        centroids <- sf::st_centroid(poly_sf)
+        centroid_coords <- sf::st_coordinates(centroids)
+        centroids[[lon]] <- centroid_coords[, 1]
+        centroids[[lat]] <- centroid_coords[, 2]
+        df <- as.data.frame(sf::st_drop_geometry(centroids))
+      }
+      else{
+        stop("You must provide either a valid input points dataframe or polygon shapefile/sf object.")
+      }
+    }
+
+  if (all(is.na(df[[sname]]))) {
     stop("Species column has only missing values.")
   }
-
 
   # ----------------------------------------------------------------
   # ----- Prepare coordinate reference systems -----
   # ----------------------------------------------------------------
   equal_area_crs <- 6933  # World Cylindrical Equal Area projection
   wgs_crs <- 4326         # WGS84
-  if (!is.null(poly_layer)) {
-    if (inherits(poly_layer, "character")) {
-      poly_sf <- st_read(poly_layer, quiet = TRUE)
-    } else if (inherits(poly_layer, "sf")) {
-      poly_sf <- poly_layer
-    } else {
-      stop("poly_layer must be either a path to a shapefile or an sf object.")
-    }
 
+  if (!is.null(poly_layer)) {
     # ensure it's in World Equal Area
-    poly_sf <- st_transform(poly_sf, crs = 6933)}
-  # ----------------------------------------------------------------
-  # ----- Convert to sf object and transform to equal area -----
-  # ----------------------------------------------------------------
-  gdf <- sf::st_as_sf(df, coords = c(lon, lat), crs = wgs_crs)
-  gdf_proj <- sf::st_transform(gdf, crs = equal_area_crs)
+    poly_sf <- sf::st_transform(poly_sf, crs = 6933)
+  }
+
+    gdf <- sf::st_as_sf(df, coords = c(lon, lat), crs = wgs_crs)
+    gdf_proj <- sf::st_transform(gdf, crs = equal_area_crs)
+
 
   # ----------------------------------------------------------------
   # ----- Identify species list -----
@@ -128,72 +162,104 @@ run_bulkCAT <- function(input_df,
     # if processing a plant community dataset
     else
     {
-      species_subset <- gdf_proj[gdf_proj[[sname]] == species, ]
-      num_obs <- nrow(species_subset)     # count number of observations
-      if (num_obs == 0) {
-        warning("No observations for species: ", species, "; skipping.")
-        next
+        species_subset <- gdf_proj[gdf_proj[[sname]] == species, ]
+        num_obs <- nrow(species_subset)     # count number of observations
+        if (num_obs == 0) {
+          warning("No observations for species: ", species, "; skipping.")
+          next
+        }
       }
-    }
+
 
     ###### EOO: Convex Hull Area ######
+
     hull <- sf::st_convex_hull(sf::st_union(species_subset))
     eoo_area_km2 <- as.numeric(sf::st_area(hull)) / 1e6
 
     ###### AOO: 2x2 km Grid ######
     coords <- sf::st_coordinates(species_subset)
+
+    ##########################################################
+    # Options for polygon AOO calculation
     if (!is.null(poly_layer)) {
-      poly_subset <- poly_sf[poly_sf[[sname]]==species, ]
+      # calculate AOO with 2x2km cells for plants
+      if (!community){
+        poly_subset <- poly_sf[poly_sf[[sname]]==species, ]
 
-      # Fixed global origin (IUCN-style)
-      origin <- c(0, 0)
+        # Fixed global origin (IUCN-style)
+        origin <- c(0, 0)
 
-      # Get bounding box
-      bb <- sf::st_bbox(poly_subset)
+        # Get bounding box
+        bb <- sf::st_bbox(poly_subset)
 
-      # Snap bbox to grid
-      xmin <- floor((as.numeric(bb["xmin"]) - origin[1]) / grid_size) * grid_size + origin[1]
-      ymin <- floor((as.numeric(bb["ymin"]) - origin[2]) / grid_size) * grid_size + origin[2]
-      xmax <- ceiling((as.numeric(bb["xmax"]) - origin[1]) / grid_size) * grid_size + origin[1]
-      ymax <- ceiling((as.numeric(bb["ymax"]) - origin[2]) / grid_size) * grid_size + origin[2]
+        # Snap bbox to grid
+        xmin <- floor((as.numeric(bb["xmin"]) - origin[1]) / grid_size) * grid_size + origin[1]
+        ymin <- floor((as.numeric(bb["ymin"]) - origin[2]) / grid_size) * grid_size + origin[2]
+        xmax <- ceiling((as.numeric(bb["xmax"]) - origin[1]) / grid_size) * grid_size + origin[1]
+        ymax <- ceiling((as.numeric(bb["ymax"]) - origin[2]) / grid_size) * grid_size + origin[2]
 
-      # Create snapped bbox polygon
-      snapped_bbox <- sf::st_as_sfc(sf::st_bbox(
-        c(xmin = xmin, ymin = ymin, xmax = xmax, ymax = ymax),
-        crs = sf::st_crs(poly_subset)
-      ))
-      # Build grid
-      grid <- sf::st_make_grid(
-        snapped_bbox,
-        cellsize = grid_size,
-        square = TRUE
-      )
-      grid_sf <- sf::st_sf(geometry = grid)
+        # Create snapped bbox polygon
+        snapped_bbox <- sf::st_as_sfc(sf::st_bbox(
+          c(xmin = xmin, ymin = ymin, xmax = xmax, ymax = ymax),
+          crs = sf::st_crs(poly_subset)
+        ))
+        # Build grid
+        grid <- sf::st_make_grid(
+          snapped_bbox,
+          cellsize = grid_size,
+          square = TRUE
+        )
+        grid_sf <- sf::st_sf(geometry = grid)
 
-      # Intersect grid with species geometry
-      hits <- sf::st_intersects(grid_sf, poly_subset, sparse = FALSE)
-      # Count occupied cells
-      aoo_cells <- sum(apply(hits, 1, any))
-    } else{
-
+        # Intersect grid with species geometry
+        hits <- sf::st_intersects(grid_sf, poly_subset, sparse = FALSE)
+        # Count occupied cells
+        aoo_cells <- sum(apply(hits, 1, any))
+      }
+      # calculate AOO with based on total area in sq-km for communities
+      else {
+        poly_subset <- poly_sf[poly_sf[[sname]]==species, ]
+        aoo_km2 <- sum(as.numeric(sf::st_area(poly_subset)), na.rm = TRUE) / 1e6
+      }
+    }
+    # if no polygon layer provided
+    else {
+      # if AOO should be calculated based on the input_df (unlikely for communities unless using plot data, common for plants)
       bottomleftpoints <- floor(coords / grid_size)
       uniquecells <- unique(bottomleftpoints)
       aoo_cells <- nrow(uniquecells)
-    }
+        if (community)
+        {
+          # convert cells to km2
+          aoo_km2 <- aoo_cells * (grid_size^2) / 1e6
+        }
+        }
 
     ###### EO Cluster Count (1 km buffer) ######
+    # note that this could be modified to allow for number of EO calculation based on polygons (most relevant for plants)
     clustering <- dbscan::dbscan(coords, eps = eo_separation, minPts = 1)
     num_clusters <- length(unique(clustering$cluster))
 
     ###### Append to results ######
+    if (!community){
+      results <- rbind(results, data.frame(
+        species = species,
+        num_obs = num_obs,
+        eoo_area_km2 = round(eoo_area_km2, 2),
+        aoo_num_cells = aoo_cells,
+        num_EOs = num_clusters,
+        stringsAsFactors = FALSE
+      ))
+    } else{
     results <- rbind(results, data.frame(
       species = species,
       num_obs = num_obs,
       eoo_area_km2 = round(eoo_area_km2, 2),
-      aoo_num_cells = aoo_cells,
+      aoo_km2 = aoo_km2,
       num_EOs = num_clusters,
       stringsAsFactors = FALSE
     ))
+    }
   }
 
   # ----------------------------------------------------------------
@@ -211,6 +277,16 @@ run_bulkCAT <- function(input_df,
     stringsAsFactors = FALSE
   )
 
+  rules_df_community <- data.frame(
+    AOOlargeVal = c(1, 2, 5, 20, 125, 500, 5000, 50000, 10000000),
+    AOOmatrixVal = c(10, 30, 100, 300, 1000, 5000, 25000, 200000, 10000000),
+    AOOsmallVal = c(0.1, 0.5, 1, 2, 5, 20, 100, 500, 10000000),
+    AOOlargeScore = c(0, 0.69, 1.38, 2.06, 2.75, 3.44, 4.13, 4.81, 5.5),
+    AOOmatrixScore = c(0, 0.69, 1.38, 2.06, 2.75, 3.44, 4.13, 4.81, 5.5),
+    AOOsmallScore = c(0, 0.69, 1.38, 2.06, 2.75, 3.44, 4.13, 4.81, 5.5),
+    stringsAsFactors = FALSE
+  )
+
   assign_points <- function(value, rules, metric) {
     val_col <- paste0(metric, "Val")
     score_col <- paste0(metric, "Score")
@@ -220,17 +296,52 @@ run_bulkCAT <- function(input_df,
   }
 
   score_eoo <- function(x) vapply(x, assign_points, numeric(1), rules = rules_df, metric = "EOO")
-  score_aoo <- function(x) vapply(x, assign_points, numeric(1), rules = rules_df, metric = "AOO")
   score_num <- function(x) vapply(x, assign_points, numeric(1), rules = rules_df, metric = "Num")
   score_rank <- function(x) vapply(x, assign_points, character(1), rules = rules_df, metric = "Rank")
 
-  results$Points <- (score_eoo(results$eoo_area_km2) +
-                             2 * score_aoo(results$aoo_num_cells) +
-                             score_num(results$num_EOs)) / 4
+  if (community){
 
-  results$SRank <- score_rank(results$Points)
+    score_aoo <- function(x) vapply(x, assign_points, numeric(1), rules = rules_df_community, metric = "AOOsmall")
+
+
+    results$Points_smallPatch <- (score_eoo(results$eoo_area_km2) +
+                                    2 * score_aoo(results$aoo_km2) +
+                                    score_num(results$num_EOs)) / 4
+    results$SRank_smallPatch <- score_rank(results$Points_smallPatch)
+
+    # calculate AOO as large match by default
+    score_aoo <- function(x) vapply(x, assign_points, numeric(1), rules = rules_df_community, metric = "AOOlarge")
+    results$Points_largePatch <- (score_eoo(results$eoo_area_km2) +
+                         2 * score_aoo(results$aoo_km2) +
+                         score_num(results$num_EOs)) / 4
+    results$SRank_largePatch <- score_rank(results$Points_largePatch)
+
+
+
+    sore_aoo <- function(x) vapply(x, assign_points, numeric(1), rules = rules_df_community, metric = "AOOmatrix")
+    results$Points_matrix <- (score_eoo(results$eoo_area_km2) +
+                                      2 * score_aoo(results$aoo_km2) +
+                                      score_num(results$num_EOs)) / 4
+    results$SRank_matrix <- score_rank(results$Points_matrix)
+
+    }
+  else{
+    score_aoo <- function(x) vapply(x, assign_points, numeric(1), rules = rules_df, metric = "AOO")
+    results$Points <- (score_eoo(results$eoo_area_km2) +
+                         2 * score_aoo(results$aoo_num_cells) +
+                         score_num(results$num_EOs)) / 4
+    results$SRank <- score_rank(results$Points)
+  }
+
   if (threats){
-    results <- calc_threats(results)
+    if (community){
+      results <- calc_threats(results, points_col = "Points_smallPatch")
+      results <- calc_threats(results, points_col = "Points_largePatch")
+      results <- calc_threats(results, points_col = "Points_matrix")
+    }
+    else{
+      results <- calc_threats(results)
+    }
   }
 
   return(results)
@@ -286,12 +397,6 @@ deduplicate <- function(input_df, cols = c("recordedBy", "recordNumber", "scient
 calc_threats <- function(input_df, points_col = "Points") {
   # create rules_df based on NS methodology (same as in run_BulkCAT())
   rules_df <- data.frame(
-    EOOVal = c(100, 250, 1000, 5000, 20000, 200000, 2500000, 25000000, NA),
-    EOOScore = c(0, 0.79, 1.57, 2.36, 3.14, 3.93, 4.71, 5.5, NA),
-    AOOVal = c(1, 2, 5, 20, 125, 500, 5000, 50000, 10000000),
-    AOOScore = c(0, 0.69, 1.38, 2.06, 2.75, 3.44, 4.13, 4.81, 5.5),
-    NumVal = c(5, 20, 80, 300, 1200, 1000000, NA, NA, NA),
-    NumScore = c(0, 1.38, 2.75, 4.13, 5.5, 5.5, NA, NA, NA),
     RankVal = c(1.5, 2.5, 3.5, 4.5, 6, NA, NA, NA, NA),
     RankScore = c("S1", "S2", "S3", "S4", "S5", NA, NA, NA, NA),
     stringsAsFactors = FALSE
@@ -320,9 +425,10 @@ calc_threats <- function(input_df, points_col = "Points") {
 
     threat <- threats$suffix[i]
     value  <- threats$value[i]
+    suffix <- sub("^Points", "", points_col)
 
+    srank_col_new <- paste0("SRank", suffix, threat)
     points_col_new <- paste0(points_col, threat)
-    srank_col_new  <- paste0("SRank", threat)
 
     input_df[[points_col_new]] <- input_df[[points_col]] * 0.7 + value * 0.3
     input_df[[srank_col_new]]  <- score_rank(input_df[[points_col_new]])

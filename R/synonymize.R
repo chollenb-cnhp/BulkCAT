@@ -30,6 +30,7 @@
 #'   \code{inputName} and \code{outputName}.
 #' @param synonym_sources Character vector giving the order of built-in synonym sources
 #'   to apply. Any of \code{"NatureServe"}, \code{"SEINet"}, \code{"USDA"}, \code{"WCVP"}.
+#' @param synonym_sources_rerun Logical. If TRUE, reload synonym sources (ex: with a new target checklist).
 #' @param fuzzy Logical. If TRUE, attempt exact and fuzzy matching using \pkg{rWCVP}.
 #' @param wcvp_rerun Logical. If TRUE, ignored cached \pkg{rWCVP} results and rerun. Note that you can pass saved LUTs from previous runs if desired in synonym_LUTs.
 #' @param ssp_mods Logical. If TRUE, perform a second pass using only binomial names
@@ -229,8 +230,7 @@ synonymize <- function(input_df,
     }
 
     # 4b apply built-in LUTs (already loaded)
-    print("Loading built-in LUTs...")
-
+    print("Applying built-in LUTs...")
 
     if (length(builtin_LUTs) > 0) {
       for (source_name in names(builtin_LUTs)) {
